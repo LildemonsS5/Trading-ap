@@ -26,9 +26,18 @@ class IntegratedSMCStrategy:
     def get_market_data(self, symbol: str, timeframe: str = "1min", limit: int = 200) -> pd.DataFrame:
         url = f"https://financialmodelingprep.com/api/v3/historical-chart/{timeframe}/{symbol}?apikey={self.api_key}"
         try:
+            print(f"🔍 Intentando obtener datos de: {url[:80]}...")
             response = self.session.get(url, headers=self.headers, timeout=15)
+            print(f"📊 Status code: {response.status_code}")
             response.raise_for_status()
             data = response.json()
+            print(f"📈 Datos recibidos: {type(data)}, longitud: {len(data) if isinstance(data, list) else 'N/A'}")
+            
+            # Verificar si la respuesta contiene un error de la API
+            if isinstance(data, dict) and 'Error Message' in data:
+                print(f"❌ Error de API: {data['Error Message']}")
+                return pd.DataFrame()
+            
             if isinstance(data, list) and len(data) > 0:
                 df = pd.DataFrame(data)
                 df['date'] = pd.to_datetime(df['date'])
@@ -40,26 +49,46 @@ class IntegratedSMCStrategy:
                 cutoff_time = datetime.now() - cutoff_timedelta
                 df = df[df['date'] >= cutoff_time].reset_index(drop=True)
                 df = df.tail(limit).reset_index(drop=True)
+                print(f"✅ DataFrame creado con {len(df)} filas para {timeframe}")
                 return df
             else:
                 print(f"❌ No se obtuvieron datos válidos para {symbol} en {timeframe}")
                 return pd.DataFrame()
         except requests.exceptions.RequestException as e:
-            print(f"❌ Error obteniendo datos para {timeframe}: {e}")
+            print(f"❌ Error de red obteniendo datos para {timeframe}: {e}")
+            return pd.DataFrame()
+        except Exception as e:
+            print(f"❌ Error inesperado obteniendo datos para {timeframe}: {e}")
             return pd.DataFrame()
 
     def get_current_price(self, symbol: str = "EURUSD") -> Dict:
         url = f"https://financialmodelingprep.com/api/v3/fx/{symbol}?apikey={self.api_key}"
         try:
+            print(f"💰 Obteniendo precio actual de: {url[:80]}...")
             response = self.session.get(url, headers=self.headers, timeout=10)
+            print(f"💰 Status code precio: {response.status_code}")
             response.raise_for_status()
             data = response.json()
-            if isinstance(data, list) and len(data) > 0: return data[0]
-            elif isinstance(data, dict): return data
+            print(f"💰 Datos de precio recibidos: {type(data)}")
+            
+            # Verificar si la respuesta contiene un error de la API
+            if isinstance(data, dict) and 'Error Message' in data:
+                print(f"❌ Error de API precio: {data['Error Message']}")
+                return {}
+            
+            if isinstance(data, list) and len(data) > 0: 
+                print(f"✅ Precio obtenido correctamente")
+                return data[0]
+            elif isinstance(data, dict): 
+                print(f"✅ Precio obtenido correctamente (dict)")
+                return data
             print(f"❌ No se obtuvieron datos de precio válidos para {symbol}")
             return {}
         except requests.exceptions.RequestException as e:
-            print(f"❌ Error obteniendo precio actual: {e}")
+            print(f"❌ Error de red obteniendo precio actual: {e}")
+            return {}
+        except Exception as e:
+            print(f"❌ Error inesperado obteniendo precio actual: {e}")
             return {}
 
     def detect_swing_points(self, df: pd.DataFrame, period: int = 5) -> Dict:
@@ -266,16 +295,22 @@ class IntegratedSMCStrategy:
 
     def analyze_symbol(self, symbol: str) -> Dict:
         print(f"\n🔍 Análisis SCALPING SMC + ICT - {symbol}...")
+        print(f"🔑 Usando API Key: {self.api_key[:10]}...")
         
         df_1min = self.get_market_data(symbol, "1min", 200)
         df_5min = self.get_market_data(symbol, "5min", 100)
         df_15min = self.get_market_data(symbol, "15min", 50)
         
+        print(f"📊 Datos obtenidos - 1min: {len(df_1min)}, 5min: {len(df_5min)}, 15min: {len(df_15min)}")
+        
         if df_1min.empty or df_5min.empty or df_15min.empty:
-            return {'error': 'No se pudieron obtener datos suficientes de todos los timeframes'}
+            error_msg = f'No se pudieron obtener datos suficientes de todos los timeframes. 1min: {len(df_1min)}, 5min: {len(df_5min)}, 15min: {len(df_15min)}'
+            print(f"❌ {error_msg}")
+            return {'error': error_msg}
         
         current_data = self.get_current_price(symbol)
         current_price = current_data.get('ask', df_1min.iloc[-1]['close']) 
+        print(f"💰 Precio actual: {current_price}")
         
         active_kill_zone = self.detect_kill_zones()
         swings_15min = self.detect_swing_points(df_15min, period=5)
@@ -297,6 +332,7 @@ class IntegratedSMCStrategy:
         best_levels = sorted(reaction_levels, key=lambda x: (x['confidence'], -x['freshness']), reverse=True)
         final_scalping_levels = [level for level in best_levels if level['distance_pips'] <= 20][:5]
 
+        print(f"✅ Análisis completado exitosamente")
         return {
             'symbol': symbol, 'current_price': current_price,
             'analysis_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
@@ -394,7 +430,7 @@ def index():
                 </div>
                 <div class="form-group">
                     <label for="apiKey">API Key (Opcional)</label>
-                    <input type="text" id="apiKey" placeholder="Tu API Key de Financial Modeling Prep">
+                    <input type="text" id="apiKey" placeholder="Tu API Key de Financial Modeling Prep" value="1OFGTIDh9osWhsdERKSn6lL7Q9lUgeNH">
                 </div>
                 <button class="analyze-btn" onclick="analyzeSymbol()">
                     <i class="fas fa-search"></i> Analizar
@@ -487,6 +523,8 @@ def analyze_trading():
         symbol = data.get('symbol', 'EURUSD').upper()
         api_key = data.get('api_key', '1OFGTIDh9osWhsdERKSn6lL7Q9lUgeNH')
         
+        print(f"🚀 Iniciando análisis para {symbol} con API key: {api_key[:10]}...")
+        
         if not symbol:
             return jsonify({'error': 'Símbolo requerido'}), 400
             
@@ -494,18 +532,46 @@ def analyze_trading():
         result = strategy.analyze_symbol(symbol)
         
         if 'error' in result:
+            print(f"❌ Error en análisis: {result['error']}")
             return jsonify({'error': result['error']}), 400
             
+        print(f"✅ Análisis completado exitosamente para {symbol}")
         return jsonify(result)
         
     except Exception as e:
         error_msg = f"Error en el análisis: {str(e)}"
-        print(f"Error detallado: {traceback.format_exc()}")
+        print(f"❌ Error detallado: {traceback.format_exc()}")
         return jsonify({'error': error_msg}), 500
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
     return jsonify({'status': 'OK', 'message': 'Trading API funcionando correctamente'})
+
+@app.route('/api/test', methods=['GET'])
+def test_api():
+    """Endpoint para probar la conexión con la API de Financial Modeling Prep"""
+    try:
+        api_key = request.args.get('api_key', '1OFGTIDh9osWhsdERKSn6lL7Q9lUgeNH')
+        symbol = request.args.get('symbol', 'EURUSD')
+        
+        # Probar conexión básica
+        url = f"https://financialmodelingprep.com/api/v3/fx/{symbol}?apikey={api_key}"
+        response = requests.get(url, timeout=10)
+        
+        return jsonify({
+            'status': 'OK',
+            'url': url,
+            'status_code': response.status_code,
+            'response_data': response.json() if response.status_code == 200 else response.text,
+            'headers': dict(response.headers)
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'ERROR',
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5004, debug=True)
