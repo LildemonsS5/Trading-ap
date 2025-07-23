@@ -1,4 +1,3 @@
-
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import os
@@ -26,31 +25,20 @@ class IntegratedSMCStrategy:
         self.PRICE_MULTIPLIER = 100000
         
     def get_market_data(self, symbol: str, timeframe: str = "1min", limit: int = 200) -> pd.DataFrame:
+        """Obtiene datos de mercado - IDÉNTICO al código base"""
         url = f"https://financialmodelingprep.com/api/v3/historical-chart/{timeframe}/{symbol}?apikey={self.api_key}"
         try:
-            print(f"🔍 Intentando obtener datos de: {url[:80]}...")
-            response = self.session.get(url, headers=self.headers, timeout=20)
-            print(f"📊 Status code: {response.status_code}")
-            
-            if response.status_code != 200:
-                print(f"❌ Error HTTP: {response.status_code}")
-                return self.generate_fallback_data(symbol, timeframe, limit)
-            
+            print(f"🔍 Obteniendo datos de {timeframe} para {symbol}...")
+            response = self.session.get(url, headers=self.headers, timeout=15)
+            response.raise_for_status()
             data = response.json()
-            print(f"📈 Datos recibidos: {type(data)}, longitud: {len(data) if isinstance(data, list) else 'N/A'}")
-            
-            # Verificar si la respuesta contiene un error de la API
-            if isinstance(data, dict) and ('Error Message' in data or 'error' in data):
-                error_msg = data.get('Error Message', data.get('error', 'Error desconocido'))
-                print(f"❌ Error de API: {error_msg}")
-                return self.generate_fallback_data(symbol, timeframe, limit)
             
             if isinstance(data, list) and len(data) > 0:
                 df = pd.DataFrame(data)
                 df['date'] = pd.to_datetime(df['date'])
                 df = df.sort_values('date').reset_index(drop=True)
                 
-                # Filtrar datos recientes
+                # Filtrar datos recientes - IDÉNTICO al código base
                 if timeframe == "1min": cutoff_timedelta = timedelta(hours=4)
                 elif timeframe == "5min": cutoff_timedelta = timedelta(hours=8)
                 elif timeframe == "15min": cutoff_timedelta = timedelta(hours=24)
@@ -60,128 +48,40 @@ class IntegratedSMCStrategy:
                 df = df[df['date'] >= cutoff_time].reset_index(drop=True)
                 df = df.tail(limit).reset_index(drop=True)
                 
-                print(f"✅ DataFrame creado con {len(df)} filas para {timeframe}")
-                
-                # Si tenemos muy pocos datos, generar datos de respaldo
-                if len(df) < 10:
-                    print(f"⚠️ Pocos datos reales ({len(df)}), generando datos de respaldo")
-                    return self.generate_fallback_data(symbol, timeframe, limit, base_price=df.iloc[-1]['close'] if len(df) > 0 else None)
-                
+                print(f"✅ Datos obtenidos: {len(df)} filas para {timeframe}")
                 return df
             else:
                 print(f"❌ No se obtuvieron datos válidos para {symbol} en {timeframe}")
-                return self.generate_fallback_data(symbol, timeframe, limit)
+                return pd.DataFrame()
                 
         except requests.exceptions.RequestException as e:
-            print(f"❌ Error de red obteniendo datos para {timeframe}: {e}")
-            return self.generate_fallback_data(symbol, timeframe, limit)
-        except Exception as e:
-            print(f"❌ Error inesperado obteniendo datos para {timeframe}: {e}")
-            return self.generate_fallback_data(symbol, timeframe, limit)
-
-    def generate_fallback_data(self, symbol: str, timeframe: str, limit: int, base_price: float = None) -> pd.DataFrame:
-        """Genera datos sintéticos cuando la API no devuelve datos suficientes"""
-        print(f"🔄 Generando datos de respaldo para {symbol} {timeframe}")
-        
-        # Precios base por defecto para diferentes pares
-        default_prices = {
-            'EURUSD': 1.0850,
-            'GBPUSD': 1.2750,
-            'USDJPY': 150.25,
-            'AUDUSD': 0.6650,
-            'USDCAD': 1.3580,
-            'NZDUSD': 0.6150,
-            'GBPJPY': 191.50,
-            'EURJPY': 163.00
-        }
-        
-        if base_price is None:
-            base_price = default_prices.get(symbol, 1.0000)
-        
-        # Configurar intervalos de tiempo
-        if timeframe == "1min":
-            time_delta = timedelta(minutes=1)
-            volatility = 0.0001
-        elif timeframe == "5min":
-            time_delta = timedelta(minutes=5)
-            volatility = 0.0003
-        elif timeframe == "15min":
-            time_delta = timedelta(minutes=15)
-            volatility = 0.0005
-        else:
-            time_delta = timedelta(hours=1)
-            volatility = 0.0008
-        
-        # Generar datos sintéticos
-        data = []
-        current_time = datetime.now() - time_delta * limit
-        current_price = base_price
-        
-        for i in range(limit):
-            # Simular movimiento de precio realista
-            change = np.random.normal(0, volatility)
-            current_price += change
-            
-            # Generar OHLC
-            high = current_price + abs(np.random.normal(0, volatility/2))
-            low = current_price - abs(np.random.normal(0, volatility/2))
-            open_price = current_price + np.random.normal(0, volatility/3)
-            close_price = current_price + np.random.normal(0, volatility/3)
-            
-            data.append({
-                'date': current_time + time_delta * i,
-                'open': round(open_price, 5),
-                'high': round(high, 5),
-                'low': round(low, 5),
-                'close': round(close_price, 5),
-                'volume': np.random.randint(1000, 10000)
-            })
-            
-            current_price = close_price
-        
-        df = pd.DataFrame(data)
-        print(f"✅ Datos de respaldo generados: {len(df)} filas para {timeframe}")
-        return df
+            print(f"❌ Error obteniendo datos para {timeframe}: {e}")
+            return pd.DataFrame()
 
     def get_current_price(self, symbol: str = "EURUSD") -> Dict:
+        """Obtiene precio actual - IDÉNTICO al código base"""
         url = f"https://financialmodelingprep.com/api/v3/fx/{symbol}?apikey={self.api_key}"
         try:
-            print(f"💰 Obteniendo precio actual de: {url[:80]}...")
+            print(f"💰 Obteniendo precio actual para {symbol}...")
             response = self.session.get(url, headers=self.headers, timeout=10)
-            print(f"💰 Status code precio: {response.status_code}")
+            response.raise_for_status()
+            data = response.json()
             
-            if response.status_code == 200:
-                data = response.json()
-                print(f"💰 Datos de precio recibidos: {type(data)}")
+            if isinstance(data, list) and len(data) > 0: 
+                print(f"✅ Precio obtenido correctamente")
+                return data[0]
+            elif isinstance(data, dict): 
+                print(f"✅ Precio obtenido correctamente (dict)")
+                return data
                 
-                if isinstance(data, list) and len(data) > 0: 
-                    print(f"✅ Precio obtenido correctamente")
-                    return data[0]
-                elif isinstance(data, dict) and 'ask' in data: 
-                    print(f"✅ Precio obtenido correctamente (dict)")
-                    return data
-            
-            # Fallback: usar precios por defecto
-            print(f"⚠️ Usando precio de respaldo para {symbol}")
-            return self.get_fallback_price(symbol)
-            
-        except Exception as e:
+            print(f"❌ No se obtuvieron datos de precio válidos para {symbol}")
+            return {}
+        except requests.exceptions.RequestException as e:
             print(f"❌ Error obteniendo precio actual: {e}")
-            return self.get_fallback_price(symbol)
-
-    def get_fallback_price(self, symbol: str) -> Dict:
-        """Devuelve precios de respaldo cuando la API falla"""
-        fallback_prices = {
-            'EURUSD': {'ask': 1.0855, 'bid': 1.0853, 'ticker': 'EUR/USD'},
-            'GBPUSD': {'ask': 1.2755, 'bid': 1.2753, 'ticker': 'GBP/USD'},
-            'USDJPY': {'ask': 150.27, 'bid': 150.25, 'ticker': 'USD/JPY'},
-            'AUDUSD': {'ask': 0.6652, 'bid': 0.6650, 'ticker': 'AUD/USD'},
-            'USDCAD': {'ask': 1.3582, 'bid': 1.3580, 'ticker': 'USD/CAD'},
-        }
-        
-        return fallback_prices.get(symbol, {'ask': 1.0000, 'bid': 0.9998, 'ticker': symbol})
+            return {}
 
     def detect_swing_points(self, df: pd.DataFrame, period: int = 5) -> Dict:
+        """Detecta swing points - IDÉNTICO al código base"""
         if len(df) < period * 2 + 1:
             return {'swing_highs': [], 'swing_lows': [], 'all_swings': []}
         swing_highs, swing_lows = [], []
@@ -195,6 +95,7 @@ class IntegratedSMCStrategy:
         return {'swing_highs': swing_highs, 'swing_lows': swing_lows, 'all_swings': all_swings}
 
     def find_liquidity_levels(self, all_swings: List[Dict], tolerance: float = 0.00005) -> List[Dict]:
+        """Encuentra niveles de liquidez - IDÉNTICO al código base"""
         if not all_swings: return []
         grouped_levels = {}
         for swing in all_swings:
@@ -225,6 +126,7 @@ class IntegratedSMCStrategy:
         return sorted(liquidity_levels, key=lambda x: x['freshness'])
 
     def detect_order_blocks(self, df: pd.DataFrame) -> List[Dict]:
+        """Detecta order blocks - IDÉNTICO al código base"""
         order_blocks = []
         if len(df) < 3: return order_blocks
         for i in range(1, len(df) - 1):
@@ -237,6 +139,7 @@ class IntegratedSMCStrategy:
         return sorted(order_blocks, key=lambda x: x['freshness'])
 
     def detect_fair_value_gaps(self, df: pd.DataFrame) -> List[Dict]:
+        """Detecta fair value gaps - IDÉNTICO al código base"""
         fvg_zones = []
         if len(df) < 3: return fvg_zones
         for i in range(2, len(df)):
@@ -250,6 +153,7 @@ class IntegratedSMCStrategy:
         return sorted(fvg_zones, key=lambda x: x['freshness'])
 
     def detect_liquidity_sweeps(self, df: pd.DataFrame, liquidity_levels: List[Dict]) -> List[Dict]:
+        """Detecta liquidity sweeps - IDÉNTICO al código base"""
         sweeps = []
         if len(df) < 2 or not liquidity_levels: return sweeps
         current_time = datetime.now()
@@ -273,6 +177,7 @@ class IntegratedSMCStrategy:
         return sorted(sweeps, key=lambda x: x['freshness'])
 
     def detect_bos_choch_improved(self, df: pd.DataFrame, swings: Dict) -> Dict:
+        """Detecta BOS/CHOCH - IDÉNTICO al código base"""
         default_response = {'bos': False, 'choch': False, 'signal': None, 'trend': 'N/A'}
         if not swings['all_swings'] or len(df) < 10: return {**default_response, 'trend': 'INSUFFICIENT_DATA'}
         
@@ -303,25 +208,37 @@ class IntegratedSMCStrategy:
         return {'bos': bos_detected, 'choch': choch_detected, 'signal': signal, 'trend': trend}
 
     def detect_kill_zones(self) -> Optional[str]:
+        """Detecta kill zones - IDÉNTICO al código base"""
         utc_now = datetime.now(pytz.utc)
         current_hour = utc_now.hour
+
+        # Horarios en UTC
         if 0 <= current_hour < 4: return "Asia Session"
         if 7 <= current_hour < 10: return "London Session"
         if 12 <= current_hour < 15: return "New York Session"
+        
         return None
 
     def calculate_premium_discount_zones(self, swings_15min: Dict) -> Dict:
+        """Calcula zonas premium/discount - IDÉNTICO al código base"""
         if not swings_15min['swing_highs'] or not swings_15min['swing_lows']:
             return {'premium_start': None, 'discount_end': None, 'equilibrium': None}
+
         recent_swings = sorted(swings_15min['all_swings'], key=lambda x: x['time'], reverse=True)[:10]
         if not recent_swings:
             return {'premium_start': None, 'discount_end': None, 'equilibrium': None}
+            
         highest_high = max(s['price'] for s in recent_swings if s['type'] == 'high')
         lowest_low = min(s['price'] for s in recent_swings if s['type'] == 'low')
+
         equilibrium = (highest_high + lowest_low) / 2
+        
         return {
-            'premium_start': equilibrium, 'discount_end': equilibrium, 'equilibrium': equilibrium,
-            'range_high': highest_high, 'range_low': lowest_low
+            'premium_start': equilibrium,
+            'discount_end': equilibrium,
+            'equilibrium': equilibrium,
+            'range_high': highest_high,
+            'range_low': lowest_low
         }
 
     def find_reaction_levels(self, df: pd.DataFrame, liquidity_levels: List[Dict], 
@@ -330,7 +247,10 @@ class IntegratedSMCStrategy:
                              sweeps: List[Dict], timeframe: str,
                              kill_zone: Optional[str], 
                              premium_discount: Dict) -> List[Dict]:
+        """Encuentra niveles de reacción - IDÉNTICO al código base"""
         reaction_levels = []
+        
+        # Combinar todas las fuentes de niveles
         all_sources = [
             *[{**ob, 'source': 'Order Block'} for ob in order_blocks],
             *[{**fvg, 'source': 'Fair Value Gap', 'price': (fvg['zone_min'] + fvg['zone_max']) / 2} for fvg in fvg_zones],
@@ -342,24 +262,26 @@ class IntegratedSMCStrategy:
             if distance_pips > 50: continue
 
             action = 'BUY' if level['type'] in ['bullish', 'low'] else 'SELL'
-            confidence = 50
+            confidence = 50 # Base confidence
             reason = f"{level['type'].capitalize()} {level['source']}"
             
+            # Lógica de confluencia mejorada
             is_in_premium = premium_discount['premium_start'] is not None and current_price >= premium_discount['premium_start']
             is_in_discount = premium_discount['discount_end'] is not None and current_price <= premium_discount['discount_end']
             
             confluence_reason = ""
             if kill_zone:
-                confidence += 25
+                confidence += 25 # Aumento por estar en una sesión activa
                 confluence_reason += f" en {kill_zone}"
 
             if action == 'BUY' and is_in_discount:
-                confidence += 25
+                confidence += 25 # Aumento por comprar en zona de descuento
                 confluence_reason += " en Zona Discount"
             elif action == 'SELL' and is_in_premium:
-                confidence += 25
+                confidence += 25 # Aumento por vender en zona premium
                 confluence_reason += " en Zona Premium"
 
+            # Validado por sweep
             validated_by_sweep = False
             if level['source'] == 'Liquidity' and level.get('is_swept'):
                 validated_by_sweep = True
@@ -384,27 +306,27 @@ class IntegratedSMCStrategy:
         return list(unique_levels.values())
 
     def analyze_symbol(self, symbol: str) -> Dict:
+        """Análisis principal - IDÉNTICO al código base con manejo de errores mejorado"""
         print(f"\n🔍 Análisis SCALPING SMC + ICT - {symbol}...")
-        print(f"🔑 Usando API Key: {self.api_key[:10]}...")
         
-        # Obtener datos con reintentos y datos de respaldo
+        # Obtener datos - IDÉNTICO al código base
         df_1min = self.get_market_data(symbol, "1min", 200)
-        time.sleep(0.5)  # Pequeña pausa entre llamadas
         df_5min = self.get_market_data(symbol, "5min", 100)
-        time.sleep(0.5)
         df_15min = self.get_market_data(symbol, "15min", 50)
         
-        print(f"📊 Datos obtenidos - 1min: {len(df_1min)}, 5min: {len(df_5min)}, 15min: {len(df_15min)}")
+        # Verificar si tenemos datos suficientes - IDÉNTICO al código base
+        if df_1min.empty or df_5min.empty or df_15min.empty:
+            return {'error': 'No se pudieron obtener datos suficientes de todos los timeframes'}
         
-        # Ahora siempre tendremos datos (reales o sintéticos)
         current_data = self.get_current_price(symbol)
         current_price = current_data.get('ask', df_1min.iloc[-1]['close']) 
-        print(f"💰 Precio actual: {current_price}")
         
+        # Obtener datos de ICT - IDÉNTICO al código base
         active_kill_zone = self.detect_kill_zones()
         swings_15min = self.detect_swing_points(df_15min, period=5)
         premium_discount_zones = self.calculate_premium_discount_zones(swings_15min)
 
+        # Análisis SMC - IDÉNTICO al código base
         liquidity_1min = self.find_liquidity_levels(self.detect_swing_points(df_1min)['all_swings'])
         sweeps_1min = self.detect_liquidity_sweeps(df_1min, liquidity_1min)
         
@@ -412,6 +334,7 @@ class IntegratedSMCStrategy:
         order_blocks_1min = self.detect_order_blocks(df_1min)
         fvg_zones_1min = self.detect_fair_value_gaps(df_1min)
 
+        # Pasar datos de ICT al análisis de niveles - IDÉNTICO al código base
         reaction_levels = self.find_reaction_levels(
             df_1min, liquidity_1min, current_price, structure_1min, 
             order_blocks_1min, fvg_zones_1min, sweeps_1min, "1min",
@@ -421,7 +344,7 @@ class IntegratedSMCStrategy:
         best_levels = sorted(reaction_levels, key=lambda x: (x['confidence'], -x['freshness']), reverse=True)
         final_scalping_levels = [level for level in best_levels if level['distance_pips'] <= 20][:5]
 
-        print(f"✅ Análisis completado exitosamente")
+        print(f"✅ Análisis completado - {len(final_scalping_levels)} niveles encontrados")
         return {
             'symbol': symbol, 'current_price': current_price,
             'analysis_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
@@ -429,11 +352,11 @@ class IntegratedSMCStrategy:
             'reaction_levels': final_scalping_levels,
             'active_kill_zone': active_kill_zone,
             'premium_discount_zones': premium_discount_zones,
-            'recommendation': self.generate_recommendation(final_scalping_levels, structure_1min, current_price),
-            'data_source': 'mixed'  # Indica que puede usar datos reales y sintéticos
+            'recommendation': self.generate_recommendation(final_scalping_levels, structure_1min, current_price)
         }
 
     def generate_recommendation(self, reaction_levels: List[Dict], structure_1min: Dict, current_price: float) -> Dict:
+        """Genera recomendación - IDÉNTICO al código base"""
         recommendation = {'action': 'HOLD', 'confidence': 0, 'reason': 'Esperando confluencia de alta probabilidad.'}
         if not reaction_levels: return recommendation
 
@@ -528,7 +451,7 @@ def index():
                 </button>
             </div>
             <div class="info-badge">
-                <i class="fas fa-info-circle"></i> Esta aplicación usa datos reales cuando están disponibles, y genera datos sintéticos de respaldo para garantizar el funcionamiento continuo.
+                <i class="fas fa-info-circle"></i> Esta aplicación usa la misma lógica que tu código base local, con manejo de errores mejorado para el entorno web.
             </div>
         </div>
         <div class="loading" id="loading">
