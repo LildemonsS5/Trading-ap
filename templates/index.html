@@ -3,16 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trading Analyzer</title>
+    <title>Trading Analyzer SMC + ICT</title>
     <style>
         body {
             font-family: Arial, sans-serif;
             background-color: #f4f4f4;
             margin: 0;
             padding: 20px;
+            color: #333;
         }
         .container {
-            max-width: 700px;
+            max-width: 800px;
             margin: auto;
             background: white;
             padding: 25px;
@@ -20,194 +21,199 @@
             box-shadow: 0 4px 8px rgba(0,0,0,0.1);
         }
         h1, h2, h3 {
-            color: #333;
+            color: #0056b3;
             text-align: center;
+            margin-bottom: 20px;
         }
         .input-group {
             display: flex;
             gap: 10px;
-            margin-bottom: 20px;
+            margin-bottom: 30px;
+            justify-content: center;
         }
-        .input-group input {
-            flex-grow: 1;
-            padding: 10px;
-            border-radius: 4px;
-            border: 1px solid #ccc;
+        .input-group input[type="text"] {
+            flex-grow: 0.7;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
         }
         .input-group button {
-            padding: 10px 20px;
+            padding: 12px 25px;
             background-color: #007bff;
             color: white;
             border: none;
-            border-radius: 4px;
+            border-radius: 5px;
             cursor: pointer;
             font-size: 16px;
+            transition: background-color 0.3s ease;
         }
         .input-group button:hover {
             background-color: #0056b3;
         }
-        #loading {
-            text-align: center;
-            font-size: 1.2em;
-            color: #666;
-            margin: 20px 0;
-        }
-        #results {
-            margin-top: 20px;
-        }
-        .result-box {
+        .result-section {
             background-color: #e9ecef;
-            border-radius: 6px;
-            padding: 15px;
+            padding: 20px;
+            border-radius: 5px;
+            margin-top: 20px;
+            font-family: monospace;
+            line-height: 1.6;
+            border: 1px solid #ccc;
+        }
+        .result-section h3 {
+            text-align: left;
+            color: #0056b3;
+            margin-top: 0;
+            border-bottom: 1px solid #0056b3;
+            padding-bottom: 5px;
             margin-bottom: 15px;
         }
-        .result-box h3 {
-            margin-top: 0;
-            color: #555;
-            font-size: 1.2em;
-            text-align: left;
+        .result-section p {
+            margin-bottom: 8px;
         }
-        .recommendation-action {
-            font-weight: bold;
-            font-size: 1.5em;
+        .result-section strong {
+            color: #000;
         }
-        .sell {
+        .error-message {
             color: red;
+            font-weight: bold;
+            text-align: center;
+            padding: 10px;
+            background-color: #ffe0e0;
+            border-radius: 5px;
         }
-        .buy {
-            color: green;
+        .recommendation {
+            font-size: 1.2em;
+            font-weight: bold;
+            text-align: center;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 5px;
         }
-        .hold {
-            color: gray;
+        .recommendation.buy {
+            background-color: #d4edda;
+            color: #155724;
         }
-        .info-item {
-            margin: 5px 0;
+        .recommendation.sell {
+            background-color: #f8d7da;
+            color: #721c24;
         }
-        .info-item strong {
-            display: inline-block;
-            width: 150px;
+        .recommendation.hold {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        .level-item {
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px dashed #ccc;
+        }
+        .level-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
         }
     </style>
 </head>
 <body>
-
-<div class="container">
-    <h1>Análisis de Trading SMC + ICT</h1>
-    <p style="text-align: center;">Ingresa un par de divisas (ej. EURUSD, AUDCAD) para analizar.</p>
-    
-    <div class="input-group">
-        <input type="text" id="symbol-input" placeholder="Ej: EURUSD" value="EURUSD">
-        <button id="analyze-button">Analizar</button>
-    </div>
-    
-    <div id="loading" style="display:none;">
-        <p>Analizando, por favor espera...</p>
-    </div>
-
-    <div id="results">
+    <div class="container">
+        <h1>Trading Analyzer SMC + ICT</h1>
+        <div class="input-group">
+            <input type="text" id="symbolInput" placeholder="Ej. EURUSD, AUDCAD">
+            <button onclick="analyzeSymbol()">Analizar</button>
         </div>
-</div>
+        <div class="result-section" id="result">
+            <p>Los resultados del análisis aparecerán aquí.</p>
+        </div>
+    </div>
 
-<script>
-    document.getElementById('analyze-button').addEventListener('click', async () => {
-        const symbol = document.getElementById('symbol-input').value.toUpperCase();
-        const resultsDiv = document.getElementById('results');
-        const loadingDiv = document.getElementById('loading');
+    <script>
+        async function analyzeSymbol() {
+            const symbol = document.getElementById("symbolInput").value;
+            const resultDiv = document.getElementById("result");
+            resultDiv.innerHTML = `<p>Analizando ${symbol.toUpperCase()}...</p>`;
 
-        if (!symbol) {
-            resultsDiv.innerHTML = '<p style="color: red; text-align: center;">Por favor, ingresa un símbolo.</p>';
-            return;
+            try {
+                const response = await fetch("/analyze", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ symbol: symbol }),
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    displayResults(data);
+                } else {
+                    resultDiv.innerHTML = `<p class="error-message">Error: ${data.error || "Error desconocido"}</p>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error-message">Error de red: ${error.message}</p>`;
+            }
         }
 
-        loadingDiv.style.display = 'block';
-        resultsDiv.innerHTML = '';
+        function displayResults(data) {
+            const resultDiv = document.getElementById("result");
+            let htmlContent = ``;
 
-        try {
-            const response = await fetch('/analyze', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ symbol: symbol })
-            });
+            // Resumen del Análisis
+            htmlContent += `<h3>Resumen del Análisis</h3>`;
+            htmlContent += `<p><strong>Símbolo:</strong> ${data.symbol}</p>`;
+            htmlContent += `<p><strong>Hora del Análisis:</strong> ${data.analysis_time}</p>`;
+            htmlContent += `<p><strong>Precio Actual:</strong> ${data.current_price.toFixed(5)}</p>`;
 
-            const data = await response.json();
+            // Recomendación Final
+            const recAction = data.recommendation.action.toLowerCase();
+            htmlContent += `<h3 style="margin-top: 25px;">Recomendación Final</h3>`;
+            htmlContent += `<div class="recommendation ${recAction.includes('buy') ? 'buy' : recAction.includes('sell') ? 'sell' : 'hold'}">`;
+            htmlContent += `<p><strong>Acción:</strong> ${data.recommendation.action}</p>`;
+            if (data.recommendation.entry_zone) {
+                htmlContent += `<p><strong>Zona de Entrada:</strong> ${data.recommendation.entry_zone}</p>`;
+            }
+            htmlContent += `<p><strong>Confianza:</strong> ${data.recommendation.confidence.toFixed(0)}%</p>`;
+            htmlContent += `<p><strong>Razón:</strong> ${data.recommendation.reason}</p>`;
+            htmlContent += `</div>`;
 
-            loadingDiv.style.display = 'none';
-
-            if (data.status === 'error') {
-                resultsDiv.innerHTML = `<div class="result-box"><h3 style="color: red;">Error en el Servidor</h3><pre>${data.message}</pre></div>`;
-                return;
+            // Contexto ICT
+            htmlContent += `<h3 style="margin-top: 25px;">Contexto SMC + ICT</h3>`;
+            htmlContent += `<p><strong>Kill Zone Activa:</strong> ${data.active_kill_zone.is_active ? data.active_kill_zone.name + ' (Prioridad: ' + data.active_kill_zone.priority.toUpperCase() + ')' : 'Ninguna'}</p>`;
+            if (data.premium_discount_zones.equilibrium) {
+                htmlContent += `<p><strong>Rango de Trading (15min):</strong> ${data.premium_discount_zones.range_low.toFixed(5)} - ${data.premium_discount_zones.range_high.toFixed(5)}</p>`;
+                htmlContent += `<p><strong>Equilibrio (50%):</strong> ${data.premium_discount_zones.equilibrium.toFixed(5)}</p>`;
+                let pos = "";
+                if (data.current_price > data.premium_discount_zones.premium_start) {
+                    pos = "PREMIUM (Ventas)";
+                } else if (data.current_price < data.premium_discount_zones.discount_end) {
+                    pos = "DISCOUNT (Compras)";
+                } else {
+                    pos = "EQUILIBRIUM";
+                }
+                htmlContent += `<p><strong>Posición Actual:</strong> Zona ${pos}</p>`;
+            } else {
+                htmlContent += `<p><strong>Zonas Premium/Discount:</strong> No se pudo determinar el rango.</p>`;
             }
 
-            const getActionClass = (action) => {
-                if (action.includes('SELL')) return 'sell';
-                if (action.includes('BUY')) return 'buy';
-                return 'hold';
-            };
+            // Estructura SMC (1min)
+            htmlContent += `<h3 style="margin-top: 25px;">Estructura SMC (1min)</h3>`;
+            htmlContent += `<p><strong>Tendencia:</strong> ${data.structure_1min.trend.toUpperCase()} | <strong>BOS:</strong> ${data.structure_1min.bos} | <strong>CHoCH:</strong> ${data.structure_1min.choch} | <strong>Señal:</strong> ${data.structure_1min.signal || 'None'}</p>`;
 
-            let reactionLevelsHtml = data.reaction_levels.length > 0 ? 
-                data.reaction_levels.map(level => `
-                    <div class="info-item">
-                        <strong>- ${level.action} @ ${level.price.toFixed(5)}</strong> 
-                        <p>${level.reason} (Confianza: ${level.confidence}%)</p>
-                    </div>
-                `).join('')
-                : '<p>No se encontraron niveles de reacción de alta probabilidad.</p>';
+            // Niveles de Reacción (1min)
+            htmlContent += `<h3 style="margin-top: 25px;">Niveles de Reacción (1min)</h3>`;
+            if (data.reaction_levels && data.reaction_levels.length > 0) {
+                data.reaction_levels.forEach((level, index) => {
+                    htmlContent += `<div class="level-item">`;
+                    htmlContent += `<p><strong>${index + 1}. ${level.action} @ ${level.price.toFixed(5)}</strong> (Confianza: ${level.confidence.toFixed(0)}%)</p>`;
+                    htmlContent += `<p><strong>Distancia:</strong> ${level.distance_pips.toFixed(1)} pips | <strong>Frescura:</strong> ${level.freshness.toFixed(1)} min</p>`;
+                    htmlContent += `<p><strong>Razón:</strong> ${level.reason}</p>`;
+                    htmlContent += `</div>`;
+                });
+            } else {
+                htmlContent += `<p>No se encontraron niveles de reacción cercanos con alta confluencia.</p>`;
+            }
 
-            resultsDiv.innerHTML = `
-                <div class="result-box">
-                    <h3>Resumen del Análisis</h3>
-                    <div class="info-item"><strong>Símbolo:</strong> ${data.symbol}</div>
-                    <div class="info-item"><strong>Hora del Análisis:</strong> ${data.analysis_time}</div>
-                    <div class="info-item"><strong>Precio Actual:</strong> ${data.current_price.toFixed(5)}</div>
-                </div>
-
-                <div class="result-box">
-                    <h3>Recomendación Final</h3>
-                    <div class="info-item">
-                        <strong>Acción:</strong> 
-                        <span class="recommendation-action ${getActionClass(data.recommendation.action)}">
-                            ${data.recommendation.action}
-                        </span>
-                    </div>
-                    <div class="info-item">
-                        <strong>Confianza:</strong> ${data.recommendation.confidence}%
-                    </div>
-                    <div class="info-item">
-                        <strong>Motivo:</strong> ${data.recommendation.reason}
-                    </div>
-                </div>
-                
-                <div class="result-box">
-                    <h3>Contexto SMC + ICT</h3>
-                    <div class="info-item">
-                        <strong>Tendencia (1min):</strong> ${data.structure_1min.trend.toUpperCase()}
-                    </div>
-                    <div class="info-item">
-                        <strong>BOS:</strong> ${data.structure_1min.bos ? 'Sí' : 'No'} | 
-                        <strong>CHoCH:</strong> ${data.structure_1min.choch ? 'Sí' : 'No'}
-                    </div>
-                    <hr style="margin: 10px 0;">
-                    <div class="info-item">
-                        <strong>Kill Zone Activa:</strong> ${data.active_kill_zone.is_active ? data.active_kill_zone.name : 'Ninguna'}
-                    </div>
-                    <div class="info-item">
-                        <strong>Zona P/D:</strong> ${data.premium_discount_zones.current_zone.toUpperCase()}
-                        <p style="margin: 5px 0 0 155px;">(Rango: ${data.premium_discount_zones.range_low.toFixed(5)} - ${data.premium_discount_zones.range_high.toFixed(5)})</p>
-                    </div>
-                </div>
-
-                <div class="result-box">
-                    <h3>Niveles de Reacción de Alta Probabilidad</h3>
-                    ${reactionLevelsHtml}
-                </div>
-            `;
-        } catch (error) {
-            loadingDiv.style.display = 'none';
-            resultsDiv.innerHTML = `<div class="result-box"><h3 style="color: red;">Error de Conexión</h3><p>No se pudo conectar con el servidor. Verifica el estado de la aplicación.</p></div>`;
-            console.error('Error:', error);
+            resultDiv.innerHTML = htmlContent;
         }
-    });
-</script>
-
+    </script>
 </body>
-</html>
+    </html>
